@@ -1,0 +1,48 @@
+setwd("~/r_working")
+library("limma")
+library(edgeR)
+data <- read.table("gene.counts.subset.mhorn", header=TRUE)
+barplot(colSums(data)*1e-6, names=1:8, ylab="Library size (millions)")
+size <- factor(c(rep("SM", 4), rep("LG", 4)))
+
+design <- model.matrix(~size)
+
+
+y <- DGEList(counts=data, group=size)
+
+###the code below filters genes without at least one read per million mapping across all four replicates in each group
+keep <- rowSums(cpm(y)>1) >= 4
+y <- y[keep,]
+##then recalculates the library sizes
+y$samples$lib.size <- colSums(y$counts)
+barplot(colSums(y$counts)*1e-6, names=1:8, ylab="Library size (millions)")
+y <- calcNormFactors(y)
+v <- voom(y,design,plot=TRUE)
+fit <- lmFit(v,design)
+fit <- eBayes(fit)
+options(digits=3)
+topTable(fit, coef=1, sort="p", p.value=0.5)
+topTable(fit, coef=2, sort="p", p.value=0.5)
+summary(dt <- decideTests(fit, p.value=0.05))
+limma::plotMA(fit, status=size,array=2)
+abline(h=c(-1,1), col="blue")
+
+###trying a different contrast matrix
+###1=sm, 2=lg
+
+group <- factor(c(1,1,1,1,2,2,2,2))
+design.2 <- model.matrix(~group)
+y.2 <- DGEList(counts=data, group=group)
+keep.2 <- rowSums(cpm(y.2)>1) >= 4
+y.2 <- y.2[keep.2,]
+y.2$samples$lib.size <- colSums(y.2$counts)
+y.2 <- calcNormFactors(y.2)
+v.2 <- voom(y.2,design.2,plot=TRUE)
+fit.2 <- lmFit(v.2,design.2)
+fit.2 <- eBayes(fit.2)
+options(digits=3)
+topTable(fit.2, coef=1, sort="p", p.value=0.5)
+topTable(fit.2, coef=2, sort="p", p.value=0.5)
+summary(dt.2 <- decideTests(fit.2, p.value=0.05))
+limma::plotMA(fit.2, status=group,array=2)
+abline(h=c(-1,1), col="blue")
