@@ -1,0 +1,28 @@
+setwd("~/r_working")
+library("edgeR")
+data <- read.table("gene.counts.subset.mhorn.2", header=TRUE, row.names="gene")
+##edgeR needs integer counts, so I rounded the counts from RSEM
+round.data <- round(data)
+group <- factor(c(1,1,1,1,2,2,2,2))
+design <- model.matrix(~group)
+##colnames(design) <- c("SM","LG")##should I use this???
+y <- DGEList(counts=round.data, group=group)
+keep <- rowSums(cpm(y)>1) >= 4
+y <- y[keep,]
+y$samples$lib.size <- colSums(y$counts)
+y <- calcNormFactors(y)
+y <- estimateGLMCommonDisp(y, design, verbose=TRUE)
+y <- estimateGLMTrendedDisp(y, design)
+y <- estimateGLMTagwiseDisp(y, design)
+###et <- exactTest(y)
+fit <- glmFit(y, design)
+lrt <- glmLRT(fit, coef=2)
+topTags(lrt, n=20, adjust.method="BH", sort.by="PValue")
+###topTags(et, n=20, adjust.method="BH", sort.by="PValue")
+summary(dt <- decideTestsDGE(lrt))
+isDE <- as.logical(dt)
+DEnames <- rownames(y)[isDE]
+plotSmear(lrt, de.tags=DEnames)
+abline(h=c(-1,1), col="blue")
+plotBCV(y)
+plotMDS.DGEList(y, top=50,method="BCV")
